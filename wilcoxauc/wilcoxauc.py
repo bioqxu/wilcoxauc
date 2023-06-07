@@ -61,8 +61,9 @@ def expr_auroc_over_groups(expr, groups):
 
     return auroc
 
+
 def wilcoxauc(adata, group_name, layer=None):
-    expr = get_expr(adata)
+    expr = get_expr(adata, layer=layer)
 
     # Turn string groups into integers
     le = preprocessing.LabelEncoder()
@@ -73,38 +74,42 @@ def wilcoxauc(adata, group_name, layer=None):
     auroc = expr_auroc_over_groups(expr, groups)
 
     if layer is not None:
-        features = adata.index
+        features = adata.var.index
+        sc.tl.rank_genes_groups(adata, group_name, layer=layer, use_raw=False,
+                        method='wilcoxon', key_added = "wilcoxon")
     else:
         features = adata.raw.index
+        sc.tl.rank_genes_groups(adata, group_name, 
+                                method='wilcoxon', key_added = "wilcoxon")
 
     auroc_df = pd.DataFrame(auroc).T
     auroc_df.index = features
     auroc_df.columns = range(groups.max() + 1)
 
-    sc.tl.rank_genes_groups(adata, group_name, layer=layer, 
-                            method='wilcoxon', key_added = "wilcoxon")
-
     res=pd.DataFrame()
-
     for c in range(groups.max() + 1):
         cstast = sc.get.rank_genes_groups_df(adata, group=str(c), key='wilcoxon')
         cauc = pd.DataFrame(auroc_df[c]).reset_index().rename(columns={'index':'names', c:'auc'})
         cres = pd.merge(cstast, cauc, on='names')
         cres['group']=str(c)
         res = pd.concat([res, cres])
+        
+    res = res.reset_index(drop=True)
     
     return res
-    
+         
 def top_markers(res, n=10, auc_min=0, pval_max=1, padj_max=1):
+    groups = res.group.unique()
+    
     res = res[(res.auc>auc_min) & (res.pvals<pval_max) & (res.pvals_adj<padj_max)]
 
     res_ntop=pd.DataFrame()
-    for c in range(groups.max() + 1):
-        ntop_genes = res[res.group==str(c)].sort_values('auc', ascending=False).head(n).names.tolist()
+    for c in groups:
+        ntop_genes = res[res.group==c].sort_values('auc', ascending=False).head(n).names.tolist()
 
         if len(ntop_genes)<n:
             ntop_genes.extend((n-len(ntop_genes)) *[np.nan])
 
-        res_ntop[str(c)] = ntop_genes
+        res_ntop[c] = ntop_genes
 
     return res_ntop
