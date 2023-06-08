@@ -98,7 +98,7 @@ def top_markers(res, ntop='all', auc_min=0, logfc_min=0, pval_max=1, padj_max=1)
     groups = res.group.unique()
 
     res = res[(res.auc>auc_min) &
-              (res.logfoldchanges<logfc_min) & 
+              (res.logfoldchanges>logfc_min) & 
               (res.pvals<pval_max) & 
               (res.pvals_adj<padj_max)]
 
