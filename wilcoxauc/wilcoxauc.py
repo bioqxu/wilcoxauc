@@ -93,19 +93,32 @@ def wilcoxauc(adata, group_name, layer=None):
     res = res.reset_index(drop=True)
     
     return res
-             
-def top_markers(res, n=10, auc_min=0, pval_max=1, padj_max=1):
+
+def top_markers(res, ntop='all', auc_min=0, logfc_min=0, pval_max=1, padj_max=1):
     groups = res.group.unique()
 
-    res = res[(res.auc>auc_min) & (res.pvals<pval_max) & (res.pvals_adj<padj_max)]
+    res = res[(res.auc>auc_min) &
+              (res.logfoldchanges<logfc_min) & 
+              (res.pvals<pval_max) & 
+              (res.pvals_adj<padj_max)]
 
-    res_ntop=pd.DataFrame()
+    res_ntop_list = []
     for group in groups:
-        ntop_genes = res[res.group==group].sort_values('auc', ascending=False).head(n).names.tolist()
+        ntop_genes = (pd.DataFrame(res[res.group==group]
+                                  .sort_values('auc', ascending=False)
+                                  .reset_index(drop=True)['names'])
+                    .rename(columns={'names':group}))
 
-        if len(ntop_genes)<n:
-            ntop_genes.extend((n-len(ntop_genes)) *[np.nan])
+        res_ntop_list.append(ntop_genes)
 
-        res_ntop[group] = ntop_genes
+    res_ntop = pd.concat(res_ntop_list, axis=1)
     res_ntop.index.name='rank'
+
+    if ntop == 'all':
+        res_ntop = res_ntop
+    elif isinstance(ntop, int):
+        res_ntop = res_ntop.head(ntop)
+    else:
+        raise ValueError('ntop should a number or all') 
+        
     return res_ntop
