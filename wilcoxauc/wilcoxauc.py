@@ -54,29 +54,25 @@ vmap_auroc = jax.vmap(jit_auroc, in_axes=[1, None])
 
 def expr_auroc_over_groups(expr, groups):
     """Computes AUROC for each group separately."""
-    auroc = np.zeros((groups.max() + 1, expr.shape[1]))
+    auroc = np.zeros((len(groups), expr.shape[1]))
 
-    for group in range(groups.max() + 1):
-        auroc[group, :] = np.array(vmap_auroc(expr, groups == group))
+    for i, group in enumerate(groups):
+        auroc[i, :] = np.array(vmap_auroc(expr, groups == group))
 
     return auroc
-
 
 def wilcoxauc(adata, group_name, layer=None):
     expr = get_expr(adata, layer=layer)
 
-    # Turn string groups into integers
-    le = preprocessing.LabelEncoder()
-    le.fit(adata.obs[group_name])
-
-    groups = jnp.array(le.transform(adata.obs[group_name]))
-
+    groups = adata.obs[group_name].unique()
+    
     auroc = expr_auroc_over_groups(expr, groups)
 
     if layer is not None:
         features = adata.var.index
         sc.tl.rank_genes_groups(adata, group_name, layer=layer, use_raw=False,
                         method='wilcoxon', key_added = "wilcoxon")
+
     else:
         features = adata.raw.index
         sc.tl.rank_genes_groups(adata, group_name, 
@@ -84,32 +80,32 @@ def wilcoxauc(adata, group_name, layer=None):
 
     auroc_df = pd.DataFrame(auroc).T
     auroc_df.index = features
-    auroc_df.columns = range(groups.max() + 1)
+    auroc_df.columns = groups
 
     res=pd.DataFrame()
-    for c in range(groups.max() + 1):
-        cstast = sc.get.rank_genes_groups_df(adata, group=str(c), key='wilcoxon')
-        cauc = pd.DataFrame(auroc_df[c]).reset_index().rename(columns={'index':'names', c:'auc'})
+    for group in groups:
+        cstast = sc.get.rank_genes_groups_df(adata, group=group, key='wilcoxon')
+        cauc = pd.DataFrame(auroc_df[group]).reset_index().rename(columns={'index':'names', group:'auc'})
         cres = pd.merge(cstast, cauc, on='names')
-        cres['group']=str(c)
+        cres['group']=group
         res = pd.concat([res, cres])
         
     res = res.reset_index(drop=True)
     
     return res
-         
+             
 def top_markers(res, n=10, auc_min=0, pval_max=1, padj_max=1):
     groups = res.group.unique()
-    
+
     res = res[(res.auc>auc_min) & (res.pvals<pval_max) & (res.pvals_adj<padj_max)]
 
     res_ntop=pd.DataFrame()
-    for c in groups:
-        ntop_genes = res[res.group==c].sort_values('auc', ascending=False).head(n).names.tolist()
+    for group in groups:
+        ntop_genes = res[res.group==group].sort_values('auc', ascending=False).head(n).names.tolist()
 
         if len(ntop_genes)<n:
             ntop_genes.extend((n-len(ntop_genes)) *[np.nan])
 
-        res_ntop[c] = ntop_genes
-
+        res_ntop[group] = ntop_genes
+    res_ntop.index.name='rank'
     return res_ntop
