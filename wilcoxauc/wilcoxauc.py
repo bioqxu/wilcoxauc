@@ -74,7 +74,7 @@ def wilcoxauc(adata, group_name, layer=None):
                         method='wilcoxon', key_added = "wilcoxon")
 
     else:
-        features = adata.raw.index
+        features = adata.raw.var.index
         sc.tl.rank_genes_groups(adata, group_name, 
                                 method='wilcoxon', key_added = "wilcoxon")
 
