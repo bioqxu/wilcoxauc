@@ -52,21 +52,22 @@ def jit_auroc(x, groups):
 
 vmap_auroc = jax.vmap(jit_auroc, in_axes=[1, None])
 
-def expr_auroc_over_groups(expr, groups):
+def expr_auroc_over_groups(expr, uni_groups, groups):
     """Computes AUROC for each group separately."""
-    auroc = np.zeros((len(groups), expr.shape[1]))
+    auroc = np.zeros((len(uni_groups), expr.shape[1]))
 
-    for i, group in enumerate(groups):
-        auroc[i, :] = np.array(vmap_auroc(expr, groups == group))
+    for i, group in enumerate(uni_groups):
+        auroc[i, :] = np.array(vmap_auroc(expr, groups == np.array([group])))
 
     return auroc
 
 def wilcoxauc(adata, group_name, layer=None):
     expr = get_expr(adata, layer=layer)
-
-    groups = adata.obs[group_name].unique()
     
-    auroc = expr_auroc_over_groups(expr, groups)
+    groups = adata.obs[group_name].tolist()
+    uni_groups = adata.obs[group_name].unique()
+
+    auroc = expr_auroc_over_groups(expr, uni_groups, groups)
 
     if layer is not None:
         features = adata.var.index
