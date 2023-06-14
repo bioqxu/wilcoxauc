@@ -63,7 +63,7 @@ def expr_auroc_over_groups(expr, uni_groups, groups):
 
 def wilcoxauc(adata, group_name, layer=None):
     expr = get_expr(adata, layer=layer)
-    
+
     groups = adata.obs[group_name].tolist()
     uni_groups = adata.obs[group_name].unique()
 
@@ -81,10 +81,10 @@ def wilcoxauc(adata, group_name, layer=None):
 
     auroc_df = pd.DataFrame(auroc).T
     auroc_df.index = features
-    auroc_df.columns = groups
+    auroc_df.columns = uni_groups
 
     res=pd.DataFrame()
-    for group in groups:
+    for group in uni_groups:
         cstast = sc.get.rank_genes_groups_df(adata, group=group, key='wilcoxon')
         cauc = pd.DataFrame(auroc_df[group]).reset_index().rename(columns={'index':'names', group:'auc'})
         cres = pd.merge(cstast, cauc, on='names')
